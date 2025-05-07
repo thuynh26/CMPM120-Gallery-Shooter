@@ -8,8 +8,12 @@ class Game extends Phaser.Scene {
         this.playerX = 480;
         this.playerY = 435;
 
-        // Array to hold active projectiles
+        // Array to hold active projectiles 
         this.projectiles = [];
+
+        // Array to hold food projectiles player emmits 
+        this.my.sprite.food = [];
+        this.maxFood = 10;
     }
 
     preload() {
@@ -25,11 +29,12 @@ class Game extends Phaser.Scene {
         this.load.image("hurtFace", "headShock.png");
 
         // load in food profectiles
-        this.load.image("projectile", "projectile.png");
+        this.load.image("sushi", "Lsushi.png");
     }
 
     create() {
         let my = this.my;
+
         // add in tile map
         this.map = this.add.tilemap("map", 16, 16, 62, 37);
         this.tileset = this.map.addTilesetImage("tiny-town-packed", "tiny_town_tiles");
@@ -54,45 +59,52 @@ class Game extends Phaser.Scene {
         ]);
         this.hurtFace.visible = false;
 
+        this.left = this.input.keyboard.addKey("A");
+        this.right = this.input.keyboard.addKey("D");
+        this.nextScene = this.input.keyboard.addKey("S");
+        this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
+        // Set movement speeds (in pixels/tick)
+        this.playerSpeed = 10;
+        this.foodSpeed = 5;
 
-        // player character
-        // my.playerContainer = this.add.sprite(this.bodyX, this.bodyY, "character");
-
-        /* projectile sprite
-        my.sprite.projectile = this.add.sprite(this.bodyX, this.bodyY, "projectile");
-        my.sprite.projectile.scale = 2;
-        my.sprite.projectile.visible = false;
-        */
-
-        // key objects for inputs
-        this.aKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-        this.dKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        // HTML controls description
+        // document.getElementById('description').innerHTML = '<h2>CONTROLS</h2><br>A: left // D: right // Space: fire/emit food'
     }
 
     update() {
         let my = this.my;
 
         // player movement : left
-        if(this.aKey.isDown) {
-            this.playerContainer.x -= 16;
+        if(this.left.isDown) {
+            if(this.playerContainer.x > (this.playerContainer.displayWidth / 2)) {
+                this.playerContainer.x -= this.playerSpeed;
+            }
         }
 
         // player movement : right
-        if(this.dKey.isDown) {
-            this.playerContainer.x += 16;
+        if(this.right.isDown) {
+            if(this.playerContainer.x < (game.config.width - (this.playerContainer.displayWidth / 2))) {
+                this.playerContainer.x += this.playerSpeed;
+            }
         }
 
-        // keep player from going off screen
-        const characterWidth = this.defaultFace.width * this.playerContainer.scaleX;
-        console.log(characterWidth);
-        this.playerContainer.x = Phaser.Math.Clamp(
-            this.playerContainer.x, 
-            characterWidth / 2, 
-            960 - characterWidth / 2
-        );
+        // player action : shooting food
+        if(Phaser.Input.Keyboard.JustDown(this.space)) {
+            if(my.sprite.food.length < this.maxFood) {
+                my.sprite.food.push(this.add.sprite(this.playerContainer.x, this.playerContainer.y - (this.playerContainer.displayHeight / 2), "sushi"));
+            }
+        }
 
+        // move all active food projectiles
+        for(let food of my.sprite.food) {
+            food.y -= this.foodSpeed;
+        }
+
+        // remove all offscreen projectiles 
+        my.sprite.food = my.sprite.food.filter((food) => food.y > -(food.displayHeight/2));
+
+        /*
         // shoot projectiles
         if(Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
             let proj = this.add.sprite(this.playerContainer.x, this.playerContainer.y, "projectile")
@@ -110,6 +122,7 @@ class Game extends Phaser.Scene {
                 this.projectiles.splice(i, 1);
             }
         }
+        */
     }
 
 }
