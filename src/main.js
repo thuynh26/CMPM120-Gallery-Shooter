@@ -9,9 +9,9 @@ let config = {
     },
     backgroundColor: '#bbbbbb',
 
-    // 62 x 37 tiles, each 16px
-    width: 992,
-    height: 592,
+    // 30 x 14 tiles, each 16px, scaled 2x
+    width: 960,
+    height: 480,
     scene: [Game],
     fps: {
         forceSetTimeOut: true, 

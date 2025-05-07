@@ -5,8 +5,8 @@ class Game extends Phaser.Scene {
         this.my = {sprite: {}};  // Create an object to hold sprite bindings
 
         // where sprites are loaded on page
-        this.playerX = 496;
-        this.playerY = 545;
+        this.playerX = 480;
+        this.playerY = 435;
 
         // Array to hold active projectiles
         this.projectiles = [];
@@ -36,6 +36,10 @@ class Game extends Phaser.Scene {
 
         this.grassLayer = this.map.createLayer("Grass-n-Paths", this.tileset, 0, 0);
         this.plantsLayer = this.map.createLayer("Plants-n-Stones", this.tileset, 0, 0);
+        this.treesLayer = this.map.createLayer("Trees", this.tileset, 0, 0);
+        this.grassLayer.setScale(2.0);
+        this.plantsLayer.setScale(2.0);
+        this.treesLayer.setScale(2.0);
 
         // add in player character
         this.defaultFace = this.add.sprite(0, 0, "defaultFace");
@@ -86,7 +90,7 @@ class Game extends Phaser.Scene {
         this.playerContainer.x = Phaser.Math.Clamp(
             this.playerContainer.x, 
             characterWidth / 2, 
-            992 - characterWidth / 2
+            960 - characterWidth / 2
         );
 
         // shoot projectiles
