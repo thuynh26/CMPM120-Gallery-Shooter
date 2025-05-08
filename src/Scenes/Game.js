@@ -13,7 +13,6 @@ class Game extends Phaser.Scene {
 
 
         // array to hold food projectiles player emmits 
-        this.my.sprite.food = [];
         this.maxFood = 10;
 
         this.waveLevel = 1;
@@ -21,6 +20,8 @@ class Game extends Phaser.Scene {
 
     }
 
+
+    /////////////////////////// PRELOAD ///////////////////////////
     preload() {
         this.load.setPath("./assets/");
         
@@ -30,7 +31,7 @@ class Game extends Phaser.Scene {
         this.load.tilemapTiledJSON("map", "ZooMap.json");
         
 
-        // load in animal characters
+        // load in animal / enemies characters
         this.load.image("panda", "panda.png");
         this.load.image("monkey", "monkey.png");
         this.load.image("rabbit", "rabbit.png");
@@ -48,31 +49,14 @@ class Game extends Phaser.Scene {
         this.load.image("sushi", "Lsushi.png");
             // stick - animal emitted
         this.load.image("stick", "stick.png");
-
-        // record player score
-        this.playerScore = 0;
-
-        // wave level
-        this.waveLevel = 1;
-        this.maxWaves = 2;
     
     }
 
 
+    /////////////////////////// CREATE ///////////////////////////
 
     create() {
         let my = this.my;
-        this.init_game();
-
-        // Set movement speeds (in pixels/tick), player health, and animal path positions (rows)
-        this.playerSpeed = 10;
-        this.foodSpeed = 15;
-        this.playerHealth = 3;;
-
-        const rowOne = 100;
-        const rowTwo = 200;
-        const rowThree = 300;
-
 
         // reference to html text element
         // game mechanic states will displayed outside of the game canvas
@@ -81,6 +65,18 @@ class Game extends Phaser.Scene {
             score: document.getElementById("score"),
             wave: document.getElementById("wave")
         };
+
+        
+        // array to holder player projectiles 
+        this.my.sprite.food = [];
+        // array to hold animals / enemies sprites
+        this.my.sprite.animals = [];
+           // array to hold animal projectiles
+        this.my.sprite.sticks = [];
+
+        // Set movement speeds (in pixels/tick), player health
+        this.playerSpeed = 10;
+        this.foodSpeed = 15;
 
 
         // add in tile map
@@ -113,35 +109,44 @@ class Game extends Phaser.Scene {
         this.playerHitbox = this.add.rectangle(this.playerX, this.playerY, 50, 50, 0xff0000, 0);
 
 
-
-        // add in animals + score value
-        // array to hold animals / enemies sprites
-        this.my.sprite.animals = [];
-
-        this.spawnRow("panda", rowOne, 3, "panda", 4, 25);
-        this.spawnRow("monkey", rowTwo, 2, "monkey", 10.5, 25);
-        this.spawnRow("rabbit", rowThree, 4, "rabbit", 8, 25);
-
-        // array to hold animal projectiles
-        // pandas will throw sticks at intervals
-        this.my.sprite.sticks = [];
-        this.stickThrowInterval = 2000
-
-        this.time.addEvent({
-            delay: this.stickThrowInterval,
-            callback: this.throwStick,
-            callbackScope: this,
-            loop: true
-        });
-
-
         // key input objects
         this.left = this.input.keyboard.addKey("A");
         this.right = this.input.keyboard.addKey("D");
         this.nextScene = this.input.keyboard.addKey("S");
         this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
+        
+        this.time.addEvent({
+            delay: 2000,
+            callback: this.throwStick,
+            callbackScope: this,
+            loop: true
+        });
+
+        this.waves = [
+            {
+                number: 1,
+                enemies: [
+                    { type: "panda", count: 3, row: 100, speed: 4, score: 25 },
+                    { type: "monkey", count: 2, row: 200, speed: 10.5, score: 25 },
+                    { type: "rabbit", count: 4, row: 300, speed: 8, score: 25 },
+                ],
+                isChasing: false
+            },
+            {
+                number: 2,
+                enemies: [
+                    { type: "snake", count: 5, row: -50, speed: 2, score: 50 },
+                ],
+                isChasing: true
+            }
+        ];
+
+        this.init_game();
     }
+
+
+    /////////////////////////// UPDATE ///////////////////////////
 
 
     update() {
@@ -224,8 +229,11 @@ class Game extends Phaser.Scene {
             for (let animal of my.sprite.animals) {
                 if (this.collides(animal, food)) {
                     food.y = -100;
-                    animal.x = -100;
+
+                    animal.destroy();
                     animal.visible = false;
+                    this.my.sprite.animals = this.my.sprite.animals.filter(a => a !== animal); 
+
                     this.playerScore += animal.scorePoints;
                     this.updateScore();
                 }
@@ -254,84 +262,71 @@ class Game extends Phaser.Scene {
         }        
 
 
-        // If all enemies gone and we're on wave 1 move onto start wave 2
+        // If all enemies gone -> move onto next wave 
         if (
             this.my.sprite.animals.length === 0 &&
-            this.waveLevel === 1 &&
-            !this.waveStarting
+            !this.waveStarting &&
+            this.waveLevel < this.waves.length
         ) {
-            this.waveStarting = true;  // 👈 prevent repeat triggers
-            this.waveLevel = 2;
-            this.ui.wave.textContent = "Wave: 2";
-        
-            // Add slight delay to make it feel more natural
-            this.time.delayedCall(500, () => {
-                this.startWave2();
-            });
+            this.waveStarting = true;
+            this.time.delayedCall(1000, () => this.startWave(this.waveLevel + 1));
         }
-        
-
+    
 
     }
 
 
-//////////////////////// Other functions //////////////////////// 
+/////////////////////////// Other functions ///////////////////////////
 
-    // re-initialize game function
+    // wave 1 handling + initialize game function
     init_game() {
-        let my = this.my;
-
-        // reset wave
-        this.waveStarting = false;
-        this.waveLevel = 1;
-
-    
-        // Reset all player state
         this.playerHealth = 3;
         this.playerScore = 0;
-        this.waveNumber = 1;
-    
-        // Reset UI 
-        if (this.ui) {
-            this.ui.health.textContent = "❤️❤️❤️";
-            this.ui.score.textContent = "Score: 0";
-            this.ui.wave.textContent = "Wave: 1";
-        }
-    
-        // Clear old sprites if needed
-        if (my.sprite.food) {
-            my.sprite.food.forEach(f => f.destroy());
-        }
-        my.sprite.food = [];
+        this.waveLevel = 1;
+        this.waveStarting = false;
 
-        if (my.sprite.animals) {
-            my.sprite.animals.forEach(a => a.destroy());
-        }
-        my.sprite.animals = [];
+        this.ui.health.textContent = "❤️❤️❤️";
+        this.ui.score.textContent = "Score: 0";
+        this.ui.wave.textContent = "Wave: 1";
 
-    
-        if (my.sprite.sticks) {
-            my.sprite.sticks.forEach(s => s.destroy());
-        }
-        my.sprite.sticks = [];
-    
+        ["food", "animals", "sticks"].forEach(key => {
+            if (this.my.sprite[key]) this.my.sprite[key].forEach(o => o.destroy());
+            this.my.sprite[key] = [];
+        });
+
+        this.startWave(1);
     }
+
     
-    
+    startWave(waveNumber) {
+        const wave = this.waves.find(w => w.number === waveNumber);
+        if (!wave) return;
+
+        this.ui.wave.textContent = `Wave: ${wave.number}`;
+        this.waveLevel = wave.number;
+        this.waveStarting = false;
+
+        for (let enemy of wave.enemies) {
+            for (let i = 0; i < enemy.count; i++) {
+                let x = Phaser.Math.Between(50, game.config.width - 50);
+                let sprite = this.add.sprite(x, enemy.row, enemy.type).setScale(0.4).setOrigin(0.5);
+                sprite.type = enemy.type;
+                sprite.scorePoints = enemy.score;
+                sprite.speed = enemy.speed;
+                sprite.direction = Phaser.Math.Between(0, 1) ? 1 : -1;
+                sprite.isChasing = wave.isChasing;
+                this.my.sprite.animals.push(sprite);
+            }
+        }
+    }
+
 
     // collision detection function
     collides(a, b) {
         if (Math.abs(a.x - b.x) > (a.displayWidth/2 + b.displayWidth/2)) return false;
         if (Math.abs(a.y - b.y) > (a.displayHeight/2 + b.displayHeight/2)) return false;
         return true;
-    }
-
-
-    // update player score function
-    updateScore() {
-        let my = this.my;
-        this.ui.score.textContent = "Score : " + this.playerScore;
-    }    
+    }  
     
 
     // function to spawn multiple animals per row
@@ -392,20 +387,13 @@ class Game extends Phaser.Scene {
         }
         this.ui.health.textContent = hearts;
     }
-    
 
-    // start wave 2
-    startWave2() {
-        for (let i = 0; i < 5; i++) {
-            let x = Phaser.Math.Between(50, game.config.width - 50);
-            let snake = this.add.sprite(x, -50, "snake").setScale(0.4).setOrigin(0.5);
-            snake.type = "snake";
-            snake.speed = Phaser.Math.FloatBetween(1.5, 2.5);  // give each snake a slightly random speed
-            snake.scorePoints = 50;
-            snake.isChasing = true;  // flag to separate behavior
-            this.my.sprite.animals.push(snake);
-        }
-    }
+
+    // update player score function
+    updateScore() {
+        let my = this.my;
+        this.ui.score.textContent = "Score : " + this.playerScore;
+    }  
     
 
     // game over function - shows a message and lets player go back to title
