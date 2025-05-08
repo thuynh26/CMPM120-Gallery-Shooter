@@ -22,6 +22,8 @@ class Game extends Phaser.Scene {
 
 
     /////////////////////////// PRELOAD ///////////////////////////
+
+
     preload() {
         this.load.setPath("./assets/");
         
@@ -54,6 +56,7 @@ class Game extends Phaser.Scene {
 
 
     /////////////////////////// CREATE ///////////////////////////
+
 
     create() {
         let my = this.my;
@@ -115,6 +118,12 @@ class Game extends Phaser.Scene {
         this.nextScene = this.input.keyboard.addKey("S");
         this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
+        this.waveChange = this.input.keyboard.addKeys({
+            one : Phaser.Input.Keyboard.KeyCodes.ONE,
+            two : Phaser.Input.Keyboard.KeyCodes.TWO,
+            three : Phaser.Input.Keyboard.KeyCodes.THREE
+        });
+
         
         this.time.addEvent({
             delay: 2000,
@@ -136,7 +145,7 @@ class Game extends Phaser.Scene {
             {
                 number: 2,
                 enemies: [
-                    { type: "snake", count: 5, row: -50, speed: 2, score: 50 },
+                    { type: "snake", count: 8, row: -50, speed: 3, score: 50 },
                 ],
                 isChasing: true
             }
@@ -262,6 +271,18 @@ class Game extends Phaser.Scene {
         }        
 
 
+        // keyboard shortcut to change waves without having to clear
+        for (let i = 1; i <= 3; i++) {
+            const keyName = ["one", "two", "three"][i - 1];
+            if (Phaser.Input.Keyboard.JustDown(this.waveChange[keyName])) {
+                if (i <= this.waves.length) {
+                    console.log(`Jumping to Wave ${i}`);
+                    this.startWave(i);
+                }
+            }
+        }
+        
+
         // If all enemies gone -> move onto next wave 
         if (
             this.my.sprite.animals.length === 0 &&
@@ -306,14 +327,30 @@ class Game extends Phaser.Scene {
         this.waveLevel = wave.number;
         this.waveStarting = false;
 
+        // clear all current enemies, food, and sticks
+        // for wave switching 
+        ["food", "animals", "sticks"].forEach(key => {
+            if (this.my.sprite[key]) this.my.sprite[key].forEach(o => o.destroy());
+            this.my.sprite[key] = [];
+        });
+
+
         for (let enemy of wave.enemies) {
             for (let i = 0; i < enemy.count; i++) {
                 let x = Phaser.Math.Between(50, game.config.width - 50);
                 let sprite = this.add.sprite(x, enemy.row, enemy.type).setScale(0.4).setOrigin(0.5);
                 sprite.type = enemy.type;
                 sprite.scorePoints = enemy.score;
-                sprite.speed = enemy.speed;
                 sprite.direction = Phaser.Math.Between(0, 1) ? 1 : -1;
+
+                // give snakes random speed
+                if (enemy.type === "snake") {
+                    sprite.speed = Phaser.Math.FloatBetween(2, 8);
+                } else {
+                    sprite.speed = enemy.speed;
+                }
+                
+
                 sprite.isChasing = wave.isChasing;
                 this.my.sprite.animals.push(sprite);
             }
