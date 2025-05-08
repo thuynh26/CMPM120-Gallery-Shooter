@@ -15,6 +15,10 @@ class Game extends Phaser.Scene {
         // array to hold food projectiles player emmits 
         this.my.sprite.food = [];
         this.maxFood = 10;
+
+        this.waveLevel = 1;
+        this.waveStarting = false;
+
     }
 
     preload() {
@@ -58,6 +62,7 @@ class Game extends Phaser.Scene {
 
     create() {
         let my = this.my;
+        this.init_game();
 
         // Set movement speeds (in pixels/tick), player health, and animal path positions (rows)
         this.playerSpeed = 10;
@@ -104,6 +109,10 @@ class Game extends Phaser.Scene {
         ]);
         this.hurtFace.visible = false;
 
+        // player hitbox
+        this.playerHitbox = this.add.rectangle(this.playerX, this.playerY, 50, 50, 0xff0000, 0);
+
+
 
         // add in animals + score value
         // array to hold animals / enemies sprites
@@ -132,9 +141,6 @@ class Game extends Phaser.Scene {
         this.nextScene = this.input.keyboard.addKey("S");
         this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-
-        // HTML controls description
-        // document.getElementById('description').innerHTML = '<h2>CONTROLS</h2><br>A: left // D: right // Space: fire/emit food'
     }
 
 
@@ -156,16 +162,43 @@ class Game extends Phaser.Scene {
             }
         }
 
+        // make hitbox follow player
+        this.playerHitbox.x = this.playerContainer.x;
+        this.playerHitbox.y = this.playerContainer.y;
 
-        // animal movement 
+
+
+        // animal movement s
         for (let animal of my.sprite.animals) {
-            animal.x += animal.speed * animal.direction;
+            // handle snack movement
+            if (animal.isChasing) {
+                // Move snake toward player
+                let dx = this.playerContainer.x - animal.x;
+                let dy = this.playerContainer.y - animal.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
         
-            let halfWidth = animal.displayWidth / 2;
-            if (animal.x >= (game.config.width - halfWidth) || animal.x <= halfWidth) {
-                animal.direction *= -1;  // bounce
+                if (dist !== 0) {
+                    animal.x += (dx / dist) * animal.speed;
+                    animal.y += (dy / dist) * animal.speed;
+                }
+        
+                // Check if snake collides with player
+                if (this.collides(animal, this.playerHitbox)) {
+                    animal.destroy();
+                    this.my.sprite.animals = this.my.sprite.animals.filter(a => a !== animal);
+                    this.handlePlayerHit();
+                }
+
+            } else {
+                // Regular side-to-side movement for wave 1 animals
+                animal.x += animal.speed * animal.direction;
+                let halfWidth = animal.displayWidth / 2;
+                if (animal.x >= (game.config.width - halfWidth) || animal.x <= halfWidth) {
+                    animal.direction *= -1;
+                }
             }
-        }  
+        }
+        
 
 
         // player action : shooting food
@@ -213,15 +246,78 @@ class Game extends Phaser.Scene {
             }
         
             // Collision with player
-            if (this.collides(stick, this.playerContainer)) {
+            if (this.collides(stick, this.playerHitbox)) {
                 stick.destroy();
                 this.my.sprite.sticks.splice(i, 1);
                 this.handlePlayerHit();
             }
         }        
 
+
+        // If all enemies gone and we're on wave 1 move onto start wave 2
+        if (
+            this.my.sprite.animals.length === 0 &&
+            this.waveLevel === 1 &&
+            !this.waveStarting
+        ) {
+            this.waveStarting = true;  // 👈 prevent repeat triggers
+            this.waveLevel = 2;
+            this.ui.wave.textContent = "Wave: 2";
+        
+            // Add slight delay to make it feel more natural
+            this.time.delayedCall(500, () => {
+                this.startWave2();
+            });
+        }
+        
+
+
     }
 
+
+//////////////////////// Other functions //////////////////////// 
+
+    // re-initialize game function
+    init_game() {
+        let my = this.my;
+
+        // reset wave
+        this.waveStarting = false;
+        this.waveLevel = 1;
+
+    
+        // Reset all player state
+        this.playerHealth = 3;
+        this.playerScore = 0;
+        this.waveNumber = 1;
+    
+        // Reset UI 
+        if (this.ui) {
+            this.ui.health.textContent = "❤️❤️❤️";
+            this.ui.score.textContent = "Score: 0";
+            this.ui.wave.textContent = "Wave: 1";
+        }
+    
+        // Clear old sprites if needed
+        if (my.sprite.food) {
+            my.sprite.food.forEach(f => f.destroy());
+        }
+        my.sprite.food = [];
+
+        if (my.sprite.animals) {
+            my.sprite.animals.forEach(a => a.destroy());
+        }
+        my.sprite.animals = [];
+
+    
+        if (my.sprite.sticks) {
+            my.sprite.sticks.forEach(s => s.destroy());
+        }
+        my.sprite.sticks = [];
+    
+    }
+    
+    
 
     // collision detection function
     collides(a, b) {
@@ -267,7 +363,7 @@ class Game extends Phaser.Scene {
     }
 
 
-    // 
+    // functin to change health and player face when hit and check game over condition
     handlePlayerHit() {
         if (this.playerHealth > 0) {
             this.playerHealth -= 1;
@@ -283,7 +379,7 @@ class Game extends Phaser.Scene {
         }
     
         if (this.playerHealth <= 0) {
-            // this.gameOver(); 
+            this.gameOver(); 
         }
     }
 
@@ -297,5 +393,38 @@ class Game extends Phaser.Scene {
         this.ui.health.textContent = hearts;
     }
     
+
+    // start wave 2
+    startWave2() {
+        for (let i = 0; i < 5; i++) {
+            let x = Phaser.Math.Between(50, game.config.width - 50);
+            let snake = this.add.sprite(x, -50, "snake").setScale(0.4).setOrigin(0.5);
+            snake.type = "snake";
+            snake.speed = Phaser.Math.FloatBetween(1.5, 2.5);  // give each snake a slightly random speed
+            snake.scorePoints = 50;
+            snake.isChasing = true;  // flag to separate behavior
+            this.my.sprite.animals.push(snake);
+        }
+    }
+    
+
+    // game over function - shows a message and lets player go back to title
+    gameOver() {
+        this.add.text(480, 240, "GAME OVER", {
+            fontFamily: "Titan One",
+            fontSize: "48px",
+            color: "#ff0000"
+        }).setOrigin(0.5);
+    
+        this.add.text(480, 300, "Press R to Restart", {
+            fontFamily: "Titan One",
+            fontSize: "24px",
+            color: "#ffffff"
+        }).setOrigin(0.5);
+    
+        this.input.keyboard.once('keydown-R', () => {
+            this.scene.start("titleScene");  // back to title
+        });
+    }
     
 }

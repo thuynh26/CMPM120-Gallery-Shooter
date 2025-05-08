@@ -12,7 +12,7 @@ let config = {
     // 30 x 14 tiles, each 16px, scaled 2x
     width: 960,
     height: 480,
-    scene: [Game],
+    scene: [TitleScene, Game],
     fps: {
         forceSetTimeOut: true, 
         target: 30 
