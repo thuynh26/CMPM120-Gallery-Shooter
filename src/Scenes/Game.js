@@ -12,10 +12,6 @@ class Game extends Phaser.Scene {
         this.playerY = 435;
 
 
-        // array to hold active projectiles 
-        this.projectiles = [];
-
-
         // array to hold food projectiles player emmits 
         this.my.sprite.food = [];
         this.maxFood = 10;
@@ -43,15 +39,18 @@ class Game extends Phaser.Scene {
         this.load.image("hurtFace", "headShock.png");
 
 
-        // load in food profectiles
+        // load in profectiles
+            // food - player emitted
         this.load.image("sushi", "Lsushi.png");
+            // stick - animal emitted
+        this.load.image("stick", "stick.png");
 
         // record player score
         this.playerScore = 0;
 
-
-        // load font for score 
-        this.load.bitmapFont("rocketSquare", "KennyRocketSquare_0.png", "KennyRocketSquare.fnt");
+        // wave level
+        this.waveLevel = 1;
+        this.maxWaves = 2;
     
     }
 
@@ -60,13 +59,23 @@ class Game extends Phaser.Scene {
     create() {
         let my = this.my;
 
-        // Set movement speeds (in pixels/tick) and animal path positions (rows)
+        // Set movement speeds (in pixels/tick), player health, and animal path positions (rows)
         this.playerSpeed = 10;
         this.foodSpeed = 15;
+        this.playerHealth = 3;;
 
         const rowOne = 100;
         const rowTwo = 200;
         const rowThree = 300;
+
+
+        // reference to html text element
+        // game mechanic states will displayed outside of the game canvas
+        this.ui = {
+            health: document.getElementById("health"),
+            score: document.getElementById("score"),
+            wave: document.getElementById("wave")
+        };
 
 
         // add in tile map
@@ -87,14 +96,6 @@ class Game extends Phaser.Scene {
         this.hurtFace = this.add.sprite(0, 0, "hurtFace");
 
 
-        // add in animals + score value
-        // array to hold animals / enemies sprites
-        this.my.sprite.animals = [];
-
-        this.spawnRow("panda", rowOne, 3, "panda", 4, 25);
-        this.spawnRow("monkey", rowTwo, 2, "monkey", 10.5, 25);
-        this.spawnRow("rabbit", rowThree, 4, "rabbit", 8, 25);
-
         // container to hold player sprite together at position
         this.playerContainer = this.add.container(this.playerX, this.playerY, [
             this.hair,
@@ -104,15 +105,33 @@ class Game extends Phaser.Scene {
         this.hurtFace.visible = false;
 
 
+        // add in animals + score value
+        // array to hold animals / enemies sprites
+        this.my.sprite.animals = [];
+
+        this.spawnRow("panda", rowOne, 3, "panda", 4, 25);
+        this.spawnRow("monkey", rowTwo, 2, "monkey", 10.5, 25);
+        this.spawnRow("rabbit", rowThree, 4, "rabbit", 8, 25);
+
+        // array to hold animal projectiles
+        // pandas will throw sticks at intervals
+        this.my.sprite.sticks = [];
+        this.stickThrowInterval = 2000
+
+        this.time.addEvent({
+            delay: this.stickThrowInterval,
+            callback: this.throwStick,
+            callbackScope: this,
+            loop: true
+        });
+
+
         // key input objects
         this.left = this.input.keyboard.addKey("A");
         this.right = this.input.keyboard.addKey("D");
         this.nextScene = this.input.keyboard.addKey("S");
         this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-
-        // Put score on screen
-        my.text.score = this.add.bitmapText(750, 0, "rocketSquare", "Score " + this.playerScore);
 
         // HTML controls description
         // document.getElementById('description').innerHTML = '<h2>CONTROLS</h2><br>A: left // D: right // Space: fire/emit food'
@@ -152,7 +171,7 @@ class Game extends Phaser.Scene {
         // player action : shooting food
         if(Phaser.Input.Keyboard.JustDown(this.space)) {
             if(my.sprite.food.length < this.maxFood) {
-                my.sprite.food.push(this.add.sprite(this.playerContainer.x, this.playerContainer.y - (this.playerContainer.displayHeight / 2), "sushi").setScale(1.2));
+                my.sprite.food.push(  this.add.sprite(this.playerContainer.x, this.playerContainer.y - (this.playerContainer.displayHeight / 2), "sushi").setScale(1.2));
             }
         }
 
@@ -180,6 +199,27 @@ class Game extends Phaser.Scene {
             }
         }
 
+
+        // panda thrown stick with player collison detection
+        for (let i = this.my.sprite.sticks.length - 1; i >= 0; i--) {
+            let stick = this.my.sprite.sticks[i];
+            stick.y += stick.speed;
+        
+            // off screen cleanup
+            if (stick.y > game.config.height + stick.displayHeight / 2) {
+                stick.destroy();
+                this.my.sprite.sticks.splice(i, 1);
+                continue;
+            }
+        
+            // Collision with player
+            if (this.collides(stick, this.playerContainer)) {
+                stick.destroy();
+                this.my.sprite.sticks.splice(i, 1);
+                this.handlePlayerHit();
+            }
+        }        
+
     }
 
 
@@ -194,8 +234,8 @@ class Game extends Phaser.Scene {
     // update player score function
     updateScore() {
         let my = this.my;
-        my.text.score.setText("Score " + this.playerScore);
-    }
+        this.ui.score.textContent = "Score : " + this.playerScore;
+    }    
     
 
     // function to spawn multiple animals per row
@@ -212,5 +252,50 @@ class Game extends Phaser.Scene {
             this.my.sprite.animals.push(animal);
         }
     }
+
+
+    // function to emitt sticks for pandas
+    throwStick() {
+        for (let animal of this.my.sprite.animals) {
+            if (animal.type === "panda" && animal.visible) {
+                let stick = this.add.sprite(animal.x, animal.y + animal.displayHeight / 2, "stick")
+                                 .setScale(0.3);
+                stick.speed = 8;
+                this.my.sprite.sticks.push(stick);
+            }
+        }
+    }
+
+
+    // 
+    handlePlayerHit() {
+        if (this.playerHealth > 0) {
+            this.playerHealth -= 1;
+            this.updateHealthDisplay();
+    
+            // briefly show hurt player face
+            this.defaultFace.visible = false;
+            this.hurtFace.visible = true;
+            this.time.delayedCall(1000, () => {
+                this.defaultFace.visible = true;
+                this.hurtFace.visible = false;
+            });
+        }
+    
+        if (this.playerHealth <= 0) {
+            // this.gameOver(); 
+        }
+    }
+
+
+    // update player health
+    updateHealthDisplay() {
+        let hearts = "";
+        for (let i = 0; i < this.playerHealth; i++) {
+            hearts += "❤️";
+        }
+        this.ui.health.textContent = hearts;
+    }
+    
     
 }
