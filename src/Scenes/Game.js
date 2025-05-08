@@ -12,18 +12,18 @@ class Game extends Phaser.Scene {
         this.playerY = 435;
 
 
-        // Array to hold active projectiles 
+        // array to hold active projectiles 
         this.projectiles = [];
 
 
-        // Array to hold food projectiles player emmits 
+        // array to hold food projectiles player emmits 
         this.my.sprite.food = [];
         this.maxFood = 10;
     }
 
     preload() {
         this.load.setPath("./assets/");
-
+        
 
         // load in map background
         this.load.image("tiny_town_tiles", "kenny-tiny-town-tilemap-packed.png");
@@ -32,9 +32,9 @@ class Game extends Phaser.Scene {
 
         // load in animal characters
         this.load.image("panda", "panda.png");
-        // this.load.image("monkey", "monkey.png");
-        // this.load.image("rabbit", "rabbit.png");
-        // this.load.image("snake", "snake.png");
+        this.load.image("monkey", "monkey.png");
+        this.load.image("rabbit", "rabbit.png");
+        this.load.image("snake", "snake.png");
 
 
         // load in player character
@@ -46,17 +46,27 @@ class Game extends Phaser.Scene {
         // load in food profectiles
         this.load.image("sushi", "Lsushi.png");
 
-
         // record player score
         this.playerScore = 0;
 
 
         // load font for score 
         this.load.bitmapFont("rocketSquare", "KennyRocketSquare_0.png", "KennyRocketSquare.fnt");
+    
     }
+
+
 
     create() {
         let my = this.my;
+
+        // Set movement speeds (in pixels/tick) and animal path positions (rows)
+        this.playerSpeed = 10;
+        this.foodSpeed = 15;
+
+        const rowOne = 100;
+        const rowTwo = 200;
+        const rowThree = 300;
 
 
         // add in tile map
@@ -78,10 +88,12 @@ class Game extends Phaser.Scene {
 
 
         // add in animals + score value
-        my.sprite.panda = this.add.sprite(game.config.width/2, game.config.height - 400, "panda");
-        my.sprite.panda.setScale(0.40);
-        my.sprite.panda.scorePoints = 25;
+        // array to hold animals / enemies sprites
+        this.my.sprite.animals = [];
 
+        this.spawnRow("panda", rowOne, 3, "panda", 4, 25);
+        this.spawnRow("monkey", rowTwo, 2, "monkey", 10.5, 25);
+        this.spawnRow("rabbit", rowThree, 4, "rabbit", 8, 25);
 
         // container to hold player sprite together at position
         this.playerContainer = this.add.container(this.playerX, this.playerY, [
@@ -99,17 +111,13 @@ class Game extends Phaser.Scene {
         this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
 
-        // Set movement speeds (in pixels/tick)
-        this.playerSpeed = 10;
-        this.foodSpeed = 8;
-
-
         // Put score on screen
         my.text.score = this.add.bitmapText(750, 0, "rocketSquare", "Score " + this.playerScore);
 
         // HTML controls description
         // document.getElementById('description').innerHTML = '<h2>CONTROLS</h2><br>A: left // D: right // Space: fire/emit food'
     }
+
 
     update() {
         let my = this.my;
@@ -130,10 +138,21 @@ class Game extends Phaser.Scene {
         }
 
 
+        // animal movement 
+        for (let animal of my.sprite.animals) {
+            animal.x += animal.speed * animal.direction;
+        
+            let halfWidth = animal.displayWidth / 2;
+            if (animal.x >= (game.config.width - halfWidth) || animal.x <= halfWidth) {
+                animal.direction *= -1;  // bounce
+            }
+        }  
+
+
         // player action : shooting food
         if(Phaser.Input.Keyboard.JustDown(this.space)) {
             if(my.sprite.food.length < this.maxFood) {
-                my.sprite.food.push(this.add.sprite(this.playerContainer.x, this.playerContainer.y - (this.playerContainer.displayHeight / 2), "sushi"));
+                my.sprite.food.push(this.add.sprite(this.playerContainer.x, this.playerContainer.y - (this.playerContainer.displayHeight / 2), "sushi").setScale(1.2));
             }
         }
 
@@ -149,13 +168,15 @@ class Game extends Phaser.Scene {
 
 
         // check for food collision with animals
-        for(let food of my.sprite.food) {
-            if(this.collides(my.sprite.panda, food)) {
-                food.y = -100;
-                my.sprite.panda.x = -100;
-                my.sprite.panda.visible = false;
-                this.playerScore += my.sprite.panda.scorePoints;
-                this.updateScore();
+        for (let food of my.sprite.food) {
+            for (let animal of my.sprite.animals) {
+                if (this.collides(animal, food)) {
+                    food.y = -100;
+                    animal.x = -100;
+                    animal.visible = false;
+                    this.playerScore += animal.scorePoints;
+                    this.updateScore();
+                }
             }
         }
 
@@ -175,5 +196,21 @@ class Game extends Phaser.Scene {
         let my = this.my;
         my.text.score.setText("Score " + this.playerScore);
     }
+    
 
+    // function to spawn multiple animals per row
+    spawnRow(animalType, rowPos, count, spriteKey, speed, score) {
+        for (let i = 0; i < count; i++) {
+            let x = Phaser.Math.Between(50, game.config.width - 50);
+            let animal = this.add.sprite(x, rowPos, spriteKey)
+                              .setScale(0.4)
+                              .setOrigin(0.5);
+            animal.type = animalType;
+            animal.scorePoints = score;
+            animal.speed = speed;
+            animal.direction = Phaser.Math.Between(0, 1) ? 1 : -1;
+            this.my.sprite.animals.push(animal);
+        }
+    }
+    
 }
