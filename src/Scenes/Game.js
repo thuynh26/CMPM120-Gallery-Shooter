@@ -38,6 +38,7 @@ class Game extends Phaser.Scene {
         this.load.image("monkey", "monkey.png");
         this.load.image("rabbit", "rabbit.png");
         this.load.image("snake", "snake.png");
+        this.load.image("chick", "chick.png")
 
 
         // load in player character
@@ -124,6 +125,14 @@ class Game extends Phaser.Scene {
             three : Phaser.Input.Keyboard.KeyCodes.THREE
         });
 
+
+        // create path for chick animal
+        this.chickPath = this.add.path(0, 0);
+
+        this.chick = this.add.follower(this.chickPath, 0, 0, "chick").setScale(0.4);
+        this.chick.visible = false;  // hide unless wave requires it
+
+
         
         this.time.addEvent({
             delay: 2000,
@@ -131,6 +140,7 @@ class Game extends Phaser.Scene {
             callbackScope: this,
             loop: true
         });
+
 
         this.waves = [
             {
@@ -147,7 +157,8 @@ class Game extends Phaser.Scene {
                 enemies: [
                     { type: "snake", count: 8, row: -50, speed: 3, score: 50 },
                 ],
-                isChasing: true
+                isChasing: true,
+                includesChick: true
             }
         ];
 
@@ -247,6 +258,20 @@ class Game extends Phaser.Scene {
                     this.updateScore();
                 }
             }
+
+            // Check if chick gets hit by food
+            if (this.chick && this.chick.visible) {
+                for (let food of my.sprite.food) {
+                    if (this.collides(this.chick, food)) {
+                        food.y = -100;
+                        this.chick.stopFollow();
+                        this.chick.visible = false;
+                        this.playerScore += 100;
+                        this.updateScore();
+                    }
+                }
+            }
+
         }
 
 
@@ -354,6 +379,20 @@ class Game extends Phaser.Scene {
                 sprite.isChasing = wave.isChasing;
                 this.my.sprite.animals.push(sprite);
             }
+
+            // If the wave includes chick, activate its path
+            if (wave.includesChick) {
+                if (!this.chick) {
+                    this.chick = this.add.follower(this.chickPath, 0, 0, "chick").setScale(0.4);
+                }
+                this.randomChickPath(); 
+                this.chick.visible = true;
+            } else {
+                if (this.chick) {
+                    this.chick.stopFollow();
+                    this.chick.visible = false;
+                }
+            }
         }
     }
 
@@ -380,6 +419,34 @@ class Game extends Phaser.Scene {
             this.my.sprite.animals.push(animal);
         }
     }
+
+
+    // create random path for chick function
+    randomChickPath() {
+        const startX = Phaser.Math.Between(0, 960);
+        const startY = Phaser.Math.Between(0, 380);
+        const endX = Phaser.Math.Between(0, 960);
+        const endY = Phaser.Math.Between(0, 380);
+    
+        if (this.chickPath) this.chickPath.destroy(); 
+        this.chickPath = this.add.path(startX, startY);
+        this.chickPath.lineTo(endX, endY);
+    
+        // Update path follower to follow new path
+        this.chick.setPath(this.chickPath);
+        this.chick.setPosition(startX, startY);
+        this.chick.visible = true;
+    
+        this.chick.startFollow({
+            duration: Phaser.Math.Between(1500, 1000),
+            onComplete: () => {
+                this.randomChickPath();  // recurse to follow a new random line
+            },
+            rotateToPath: true,
+            rotationOffset: -90
+        });
+    }
+    
 
 
     // function to emitt sticks for pandas
