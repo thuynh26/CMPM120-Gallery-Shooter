@@ -127,7 +127,8 @@ class Game extends Phaser.Scene {
 
 
         // create path for chick animal
-        this.chickPath = this.add.path(0, 0);
+        this.chickChangingPath = false;
+        this.chickPath = this.add.path(0,0);
 
         this.chick = this.add.follower(this.chickPath, 0, 0, "chick").setScale(0.4);
         this.chick.visible = false;  // hide unless wave requires it
@@ -293,7 +294,16 @@ class Game extends Phaser.Scene {
                 this.my.sprite.sticks.splice(i, 1);
                 this.handlePlayerHit();
             }
-        }        
+        }
+        
+        
+        // chick pathing - keep updating path after end
+        if (this.chick && this.chick.visible && this.chick.isFollowing) {
+            if (!this.chickChangingPath && this.chick.pathTween && this.chick.pathTween.progress > 0.95) {
+                this.chickChangingPath = true;
+                this.randomChickPath();
+            }
+        }   
 
 
         // keyboard shortcut to change waves without having to clear
@@ -423,28 +433,27 @@ class Game extends Phaser.Scene {
 
     // create random path for chick function
     randomChickPath() {
-        const startX = Phaser.Math.Between(0, 960);
-        const startY = Phaser.Math.Between(0, 380);
-        const endX = Phaser.Math.Between(0, 960);
-        const endY = Phaser.Math.Between(0, 380);
+        if (this.chickPath) this.chickPath.destroy();
     
-        if (this.chickPath) this.chickPath.destroy(); 
+        const startX = this.chick.x;
+        const startY = this.chick.y;
+        const numPoints = Phaser.Math.Between(4, 8);
+    
         this.chickPath = this.add.path(startX, startY);
-        this.chickPath.lineTo(endX, endY);
+        for (let i = 0; i < numPoints; i++) {
+            const x = Phaser.Math.Between(0, 960);
+            const y = Phaser.Math.Between(0, 380);
+            this.chickPath.lineTo(x, y);
+        }
     
-        // Update path follower to follow new path
         this.chick.setPath(this.chickPath);
-        this.chick.setPosition(startX, startY);
-        this.chick.visible = true;
-    
         this.chick.startFollow({
-            duration: Phaser.Math.Between(1500, 1000),
-            onComplete: () => {
-                this.randomChickPath();  // recurse to follow a new random line
-            },
+            duration: Phaser.Math.Between(6000, 8000),
             rotateToPath: true,
             rotationOffset: -90
         });
+    
+        this.chickChangingPath = false;
     }
     
 
