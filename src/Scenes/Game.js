@@ -1,20 +1,11 @@
 class Game extends Phaser.Scene {
     constructor() {
-
         super("gameScene");
 
-        // hold sprite and bitmap text bindings
         this.my = {sprite: {}, text: {}};
-
-
-        // where sprites are loaded on page
         this.playerX = 480;
         this.playerY = 435;
-
-
-        // array to hold food projectiles player emmits 
         this.maxFood = 10;
-
         this.waveLevel = 1;
         this.waveStarting = false;
 
@@ -26,12 +17,10 @@ class Game extends Phaser.Scene {
 
     preload() {
         this.load.setPath("./assets/");
-        
 
         // load in map background
         this.load.image("tiny_town_tiles", "kenny-tiny-town-tilemap-packed.png");
         this.load.tilemapTiledJSON("map", "ZooMap.json");
-        
 
         // load in animal / enemies characters
         this.load.image("panda", "panda.png");
@@ -40,17 +29,13 @@ class Game extends Phaser.Scene {
         this.load.image("snake", "snake.png");
         this.load.image("chick", "chick.png")
 
-
         // load in player character
         this.load.image("defaultFace", "head.png");
         this.load.image("hair", "headBack.png");
         this.load.image("hurtFace", "headShock.png");
 
-
-        // load in profectiles
-            // food - player emitted
+        // load in profectiles for player and panda
         this.load.image("sushi", "Lsushi.png");
-            // stick - animal emitted
         this.load.image("stick", "stick.png");
     
     }
@@ -62,6 +47,14 @@ class Game extends Phaser.Scene {
     create() {
         let my = this.my;
 
+        // array to holder player / enemies projectiles and sprites
+        this.my.sprite.food = [];
+        this.my.sprite.animals = [];
+        this.my.sprite.sticks = [];
+        // Set movement speeds (in pixels/tick), player health
+        this.playerSpeed = 10;
+        this.foodSpeed = 8;
+
         // reference to html text element
         // game mechanic states will displayed outside of the game canvas
         this.ui = {
@@ -69,19 +62,6 @@ class Game extends Phaser.Scene {
             score: document.getElementById("score"),
             wave: document.getElementById("wave")
         };
-
-        
-        // array to holder player projectiles 
-        this.my.sprite.food = [];
-        // array to hold animals / enemies sprites
-        this.my.sprite.animals = [];
-           // array to hold animal projectiles
-        this.my.sprite.sticks = [];
-
-        // Set movement speeds (in pixels/tick), player health
-        this.playerSpeed = 10;
-        this.foodSpeed = 15;
-
 
         // add in tile map
         this.map = this.add.tilemap("map", 16, 16, 62, 37);
@@ -94,12 +74,10 @@ class Game extends Phaser.Scene {
         this.plantsLayer.setScale(2.0);
         this.treesLayer.setScale(2.0);
 
-
         // add in player character
         this.defaultFace = this.add.sprite(0, 0, "defaultFace");
         this.hair = this.add.sprite(0, 0, "hair");
         this.hurtFace = this.add.sprite(0, 0, "hurtFace");
-
 
         // container to hold player sprite together at position
         this.playerContainer = this.add.container(this.playerX, this.playerY, [
@@ -126,22 +104,12 @@ class Game extends Phaser.Scene {
         });
 
 
-        // create path for chick animal
-        this.chickChangingPath = false;
-        this.chickPath = this.add.path(0,0);
-
-        this.chick = this.add.follower(this.chickPath, 0, 0, "chick").setScale(0.4);
-        this.chick.visible = false;  // hide unless wave requires it
-
-
-        
         this.time.addEvent({
             delay: 2000,
             callback: this.throwStick,
             callbackScope: this,
             loop: true
         });
-
 
         this.waves = [
             {
@@ -154,14 +122,21 @@ class Game extends Phaser.Scene {
                 isChasing: false
             },
             {
-                number: 2,
+                number: 2,  
                 enemies: [
-                    { type: "snake", count: 8, row: -50, speed: 3, score: 50 },
+                    { type: "snake", count: 5, row: -50, speed: 3, score: 50 },
                 ],
                 isChasing: true,
                 includesChick: true
             }
         ];
+
+        // create path for chick animal
+        this.chickChangingPath = false;
+        this.chickPath = this.add.path(0,0);
+
+        this.chick = this.add.follower(this.chickPath, 0, 0, "chick").setScale(0.4);
+        this.chick.visible = false;  // hide unless wave requires it
 
         this.init_game();
     }
@@ -173,15 +148,12 @@ class Game extends Phaser.Scene {
     update() {
         let my = this.my;
 
-        // player movement : left
+        // player movement : left and right
         if(this.left.isDown) {
             if(this.playerContainer.x > (this.playerContainer.displayWidth / 2)) {
                 this.playerContainer.x -= this.playerSpeed;
             }
         }
-
-
-        // player movement : right
         if(this.right.isDown) {
             if(this.playerContainer.x < (game.config.width - (this.playerContainer.displayWidth / 2))) {
                 this.playerContainer.x += this.playerSpeed;
@@ -192,55 +164,16 @@ class Game extends Phaser.Scene {
         this.playerHitbox.x = this.playerContainer.x;
         this.playerHitbox.y = this.playerContainer.y;
 
-
-
-        // animal movement s
-        for (let animal of my.sprite.animals) {
-            // handle snack movement
-            if (animal.isChasing) {
-                // Move snake toward player
-                let dx = this.playerContainer.x - animal.x;
-                let dy = this.playerContainer.y - animal.y;
-                let dist = Math.sqrt(dx * dx + dy * dy);
-        
-                if (dist !== 0) {
-                    animal.x += (dx / dist) * animal.speed;
-                    animal.y += (dy / dist) * animal.speed;
-                }
-        
-                // Check if snake collides with player
-                if (this.collides(animal, this.playerHitbox)) {
-                    animal.destroy();
-                    this.my.sprite.animals = this.my.sprite.animals.filter(a => a !== animal);
-                    this.handlePlayerHit();
-                }
-
-            } else {
-                // Regular side-to-side movement for wave 1 animals
-                animal.x += animal.speed * animal.direction;
-                let halfWidth = animal.displayWidth / 2;
-                if (animal.x >= (game.config.width - halfWidth) || animal.x <= halfWidth) {
-                    animal.direction *= -1;
-                }
-            }
-        }
-        
-
-
         // player action : shooting food
+        //and move all active food projectiles
+        for(let food of my.sprite.food) {
+            food.y -= this.foodSpeed;
+        }
         if(Phaser.Input.Keyboard.JustDown(this.space)) {
             if(my.sprite.food.length < this.maxFood) {
                 my.sprite.food.push(  this.add.sprite(this.playerContainer.x, this.playerContainer.y - (this.playerContainer.displayHeight / 2), "sushi").setScale(1.2));
             }
         }
-
-
-        // move all active food projectiles
-        for(let food of my.sprite.food) {
-            food.y -= this.foodSpeed;
-        }
-
-
         // remove all offscreen projectiles 
         my.sprite.food = my.sprite.food.filter((food) => food.y > -(food.displayHeight/2));
 
@@ -259,15 +192,14 @@ class Game extends Phaser.Scene {
                     this.updateScore();
                 }
             }
-
-            // Check if chick gets hit by food
+            // check if chick gets hit by food
             if (this.chick && this.chick.visible) {
                 for (let food of my.sprite.food) {
                     if (this.collides(this.chick, food)) {
                         food.y = -100;
                         this.chick.stopFollow();
                         this.chick.visible = false;
-                        this.playerScore += 100;
+                        this.playerScore += 50;
                         this.updateScore();
                     }
                 }
@@ -275,6 +207,34 @@ class Game extends Phaser.Scene {
 
         }
 
+        // animal movement s
+        for (let animal of my.sprite.animals) {
+            // snake movement
+            if (animal.isChasing) {
+                // Move snake toward player
+                let dx = this.playerContainer.x - animal.x;
+                let dy = this.playerContainer.y - animal.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+        
+                if (dist !== 0) {
+                    animal.x += (dx / dist) * animal.speed;
+                    animal.y += (dy / dist) * animal.speed;
+                }
+                // Check if snake collides with player
+                if (this.collides(animal, this.playerHitbox)) {
+                    animal.destroy();
+                    this.my.sprite.animals = this.my.sprite.animals.filter(a => a !== animal);
+                    this.handlePlayerHit();
+                }
+            } else {
+                // movement for wave 1 animals
+                animal.x += animal.speed * animal.direction;
+                let halfWidth = animal.displayWidth / 2;
+                if (animal.x >= (game.config.width - halfWidth) || animal.x <= halfWidth) {
+                    animal.direction *= -1;
+                }
+            }
+        }
 
         // panda thrown stick with player collison detection
         for (let i = this.my.sprite.sticks.length - 1; i >= 0; i--) {
@@ -296,7 +256,6 @@ class Game extends Phaser.Scene {
             }
         }
         
-        
         // chick pathing - keep updating path after end
         if (this.chick && this.chick.visible && this.chick.isFollowing) {
             if (!this.chickChangingPath && this.chick.pathTween && this.chick.pathTween.progress > 0.95) {
@@ -316,7 +275,6 @@ class Game extends Phaser.Scene {
                 }
             }
         }
-        
 
         // If all enemies gone -> move onto next wave 
         if (
@@ -327,8 +285,6 @@ class Game extends Phaser.Scene {
             this.waveStarting = true;
             this.time.delayedCall(1000, () => this.startWave(this.waveLevel + 1));
         }
-    
-
     }
 
 
@@ -362,13 +318,11 @@ class Game extends Phaser.Scene {
         this.waveLevel = wave.number;
         this.waveStarting = false;
 
-        // clear all current enemies, food, and sticks
-        // for wave switching 
+        // clear all current enemies, food, and sticks for wave switching 
         ["food", "animals", "sticks"].forEach(key => {
             if (this.my.sprite[key]) this.my.sprite[key].forEach(o => o.destroy());
             this.my.sprite[key] = [];
         });
-
 
         for (let enemy of wave.enemies) {
             for (let i = 0; i < enemy.count; i++) {
@@ -389,7 +343,6 @@ class Game extends Phaser.Scene {
                 sprite.isChasing = wave.isChasing;
                 this.my.sprite.animals.push(sprite);
             }
-
             // If the wave includes chick, activate its path
             if (wave.includesChick) {
                 if (!this.chick) {
@@ -430,7 +383,20 @@ class Game extends Phaser.Scene {
         }
     }
 
+    
+    // function to emitt sticks for pandas
+    throwStick() {
+        for (let animal of this.my.sprite.animals) {
+            if (animal.type === "panda" && animal.visible) {
+                let stick = this.add.sprite(animal.x, animal.y + animal.displayHeight / 2, "stick")
+                                 .setScale(0.3);
+                stick.speed = 8;
+                this.my.sprite.sticks.push(stick);
+            }
+        }
+    }
 
+    
     // create random path for chick function
     randomChickPath() {
         if (this.chickPath) this.chickPath.destroy();
@@ -455,23 +421,9 @@ class Game extends Phaser.Scene {
     
         this.chickChangingPath = false;
     }
-    
 
 
-    // function to emitt sticks for pandas
-    throwStick() {
-        for (let animal of this.my.sprite.animals) {
-            if (animal.type === "panda" && animal.visible) {
-                let stick = this.add.sprite(animal.x, animal.y + animal.displayHeight / 2, "stick")
-                                 .setScale(0.3);
-                stick.speed = 8;
-                this.my.sprite.sticks.push(stick);
-            }
-        }
-    }
-
-
-    // functin to change health and player face when hit and check game over condition
+    // functin to change health and player face when hit and check gameover condition
     handlePlayerHit() {
         if (this.playerHealth > 0) {
             this.playerHealth -= 1;
